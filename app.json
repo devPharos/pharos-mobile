@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "PharosIT",
+    "slug": "pharositmobile",
+    "version": "1.0.38",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "googleServicesFile": "./google-services.json",
+      "package": "com.pharosit.mobile"
+    },
+    "androidNavigationBar": {
+      "barStyle": "light-content"
+    },
+    "plugins": [
+      "@react-native-firebase/app",
+      "@react-native-firebase/perf",
+      "@react-native-firebase/crashlytics",
+      [
+        "expo-barcode-scanner",
+        {
+          "cameraPermission": "Allow the app to access camera."
+        }
+      ]
+      
+    ],
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#111"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "eeb4fc07-5a1d-4e59-9efc-3249d6867899"
+      }
+    }
+  }
+}
