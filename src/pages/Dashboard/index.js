@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { RFPercentage } from 'react-native-responsive-fontsize';
 import { Page } from './styles';
 import HeaderLogin from '../../components/HeaderLogin';
@@ -22,6 +22,9 @@ export default function Dashboard({ navigation }) {
             setMenus(data.MENUS);
         } catch(err) {
             Alert.alert(`Atenção!`,`${err} - User: ${usuario.usuario} - Url: ${empresa.apiUrl}`);
+            if(!err.includes('status')) {
+                Linking.openURL(empresa.apiUrl)
+            }
             console.log('err', err) 
         }
     }
