@@ -15,8 +15,8 @@ export default function HeaderLogin({ full = false }) {
             <Image source={require('../../../assets/pharos_logo_white.png')} style={{ width: full ? 166 : 83, height: full ? 26 : 13 }} imageStyle={{ resizeMode: 'contain' }}></Image>
         }
         <View>
-            <Text style={{ color: "#FFF", textAlign: 'right', fontSize: full ? 12 : 10 }}>Versão 1.0.39</Text>
-            <Text style={{ color: "#FFF", textAlign: 'right', fontSize: full ? 12 : 10 }}>Build 2.01.2301</Text>
+            <Text style={{ color: "#FFF", textAlign: 'right', fontSize: full ? 12 : 10 }}>Versão 1.0.40</Text>
+            <Text style={{ color: "#FFF", textAlign: 'right', fontSize: full ? 12 : 10 }}>Build 2.01.2901</Text>
         </View>
     </View>;
 }

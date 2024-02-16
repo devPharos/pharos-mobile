@@ -23,12 +23,14 @@ export default function BarcodeReader({ name, register, control, handleBarCodeRe
     };
 
     async function handleManual(name) {
+        console.log({ name,barCodeValue })
         const response = await api.get(`${empresa.apiUrl}/Etiqueta?Etiqueta=${barCodeValue}`)
         // console.log({barCodeValue, resp: response.data})
         handleBarCodeReader(barCodeValue ? barCodeValue.toUpperCase() : '', true, response.data, name);
     }
 
     async function handleManualBarCode(value) {
+        console.log({ value })
         setBarCodeValue(value)
     }
 
