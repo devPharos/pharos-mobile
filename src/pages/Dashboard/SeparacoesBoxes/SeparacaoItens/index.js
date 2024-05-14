@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Text, View, TouchableOpacity, Alert, SafeAreaView, ScrollView, Platform, FlatList, Dimensions, Modal, Image, KeyboardAvoidingView } from 'react-native';
-import { MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { Text, View, TouchableOpacity, Alert, SafeAreaView, ScrollView, Platform, FlatList, Modal, Image, KeyboardAvoidingView } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRegister } from '../../../../hooks/register';
 import HeaderLogin from '../../../../components/HeaderLogin';
 import { Page } from '../../Rotina/styles';
@@ -11,11 +11,14 @@ import { BarCodeScanner } from 'expo-barcode-scanner';
 import theme from '../../../../global/styles/theme';
 import Loading from '../../../../components/Loading';
 import { CircularProgressBase } from 'react-native-circular-progress-indicator';
-import CameraReader from '../../../../components/CameraReader';
 import api from '../../../../services/api';
+import { MyInput } from '../../../../components/Forms/InputBarcode/styles';
+import { useForm } from 'react-hook-form';
+import axios from 'axios';
 
 export default function SeparacaoItens({ navigation, route }) {
     const { empresa, usuario } = useRegister();
+    const inputRef = useRef();
     const [openCameraReader, setOpenCameraReader] = useState(false);
     const [hasPermission, setHasPermission] = useState(null);
     const { separacao, titulo, itens } = route.params;
@@ -24,6 +27,8 @@ export default function SeparacaoItens({ navigation, route }) {
     const [reloadPosition, setReloadPosition] = useState(true);
     const { rotina } = route.params;
     const itemsFlatListRef = useRef();
+
+    const { register } = useForm();
 
     useEffect(() => {
         const getBarCodeScannerPermissions = async () => {
@@ -44,7 +49,9 @@ export default function SeparacaoItens({ navigation, route }) {
         if(reloadPosition && itens && itens.length > 0) {
             let found = false;
             for(let i = 0; i < itens.length; i++) {
-                if(itens[i].SALDOSEPARADO > 0 && !found) {
+                // console.log(i,itens[i].ocorrencia)
+                // itens[i].ocorrencia = null
+                if(itens[i].SALDOSEPARADO > 0 && !found && !itens[i].ocorrencia) {
                     found = true;
                     setTimeout(() => {
                         itemsFlatListRef.current.scrollToOffset({
@@ -57,51 +64,50 @@ export default function SeparacaoItens({ navigation, route }) {
         }
     },[reloadPosition])
 
+
     async function handleBarCodeScanned({ type, data }) {
+        const qtdItens = find.QUANTIDADE / find.QTDEMB;
+
         if(loading) {
             return;
         }
         setLoading(true);
         try {
             const { data: etiqueta } = await api.get(`${empresa.apiUrl}/Etiqueta?Etiqueta=${data}&Usuario=${usuario.usuario}`);
+
             if(etiqueta.PRODUTOS[0].CODIGO.trim() !== find.PRODUTO.trim()) {
                 setOpenCameraReader(false);
-                Alert.alert("Produto incorreto!","A etiqueta deve ser do produto: "+find.PRODUTOS[0].PRODUTO.trim())
+                Alert.alert("Produto incorreto!","A etiqueta deve ser do produto: "+find.PRODUTO.trim())
                 setLoading(false);
                 return;
             }
 
             if(etiqueta.PRODUTOS[0].ARMAZEM.trim() !== find.ARMAZEM.trim()) {
                 setOpenCameraReader(false);
-                Alert.alert("Armazém incorreto!","A etiqueta deve ser do armazém: "+find.PRODUTOS[0].ARMAZEM.trim())
+                Alert.alert("Armazém incorreto!","A etiqueta deve ser do armazém: "+find.ARMAZEM.trim())
                 setLoading(false);
                 return;
             }
 
-            if(etiqueta.PRODUTOS[0].ENDERECO.trim() !== find.ENDERECO.trim()) {
+            const totalEtiquetas = etiqueta.PRODUTOS.reduce((qtdNaEtiq, item) => qtdNaEtiq + (item.QUANTIDADE / item.QTDPOREMB), 0)
+
+            if(totalEtiquetas > qtdItens) {
                 setOpenCameraReader(false);
-                Alert.alert("Endereço incorreto!","A etiqueta deve ser do endereço: "+find.PRODUTOS[0].ENDERECO.trim())
+                Alert.alert("Quantidade superior!","A etiqueta bipada contém mais caixas do que solicitado, faça manutenção de pallet!")
                 setLoading(false);
                 return;
             }
 
-            // console.log({
-            //         Usuario: usuario.usuario,
-            //         OrdemSeparacao: separacao,
-            //         Etiqueta: etiqueta.CODIGO.trim() || etiqueta.PALLET.trim()
-            //     })
-
-            const { data: separado } = await api.post(`${empresa.apiUrl}/SeparacaoOP/separar?Usuario=${usuario.usuario}`, {
+            const { data: separado } = await api.post(`${empresa.apiUrl}/SeparacaoPV/separar?Usuario=${usuario.usuario}`, {
                 Usuario: usuario.usuario,
                 OrdemSeparacao: separacao,
                 Etiqueta: etiqueta.CODIGO.trim() || etiqueta.PALLET.trim()
             });
 
             if(separado.Message === 'Item separado.' || separado.Message === 'Separação Concluída.') {
-
+                
                 itens.map((item) => {
                     if(etiqueta.PRODUTOS[0].ARMAZEM.trim() === find.ARMAZEM.trim() && find.ARMAZEM.trim() === item.ARMAZEM.trim() &&
-                    etiqueta.PRODUTOS[0].ENDERECO.trim() === find.ENDERECO.trim() && find.ENDERECO.trim() === item.ENDERECO.trim() &&
                     etiqueta.PRODUTOS[0].CODIGO.trim() === find.PRODUTO.trim() && find.PRODUTO.trim() === item.PRODUTO.trim()) {
                         // console.log(etiqueta)
                         etiqueta.PRODUTOS.map(etq => {
@@ -130,24 +136,65 @@ export default function SeparacaoItens({ navigation, route }) {
 
             }
         } catch(err) {
-            console.log('err', err)
+            Alert.alert("Erro",err);
             setLoading(false);
         }
     };
-
-    // if (hasPermission === null) {
-    //     return <Loading title="Buscando permissão..." />;
-    // }
-    // if (hasPermission === false) {
-    //     return <Text>No access to camera</Text>;
-    // }
 
     function handleOpenCamera(item) {
         setFind(item)
         setOpenCameraReader(!openCameraReader)
     }
 
-    const Item = ({item,index,um,segum,qtdemb = 1}) => {
+    function handleOcorrencia(item) {
+        Alert.alert("Informar Ocorrência","Tem certeza de que deseja informar ocorrência para este item?",[
+            {
+                text: "Sim",
+                onPress: async () => {
+                    // console.log({
+                    //     Usuario: usuario.usuario,
+                    //     OrdemSeparacao: separacao,
+                    //     Item: item.ITEM,
+                    //     ocorrencia: "000001"
+                    // })
+                    const { data } = await api.post(`${empresa.apiUrl}/Ocorrencia?Usuario=${usuario.usuario}`, {
+                        Usuario: usuario.usuario,
+                        OrdemSeparacao: separacao,
+                        Item: item.ITEM,
+                        ocorrencia: "000001"
+                    });
+
+                    itens.map((it) => {
+                        if(it.ITEM === item.ITEM) {
+                            // console.log(it.ITEM, item.ITEM)
+                            it.ocorrencia = "000001"
+                            setOpenCameraReader(false);
+                            setLoading(false);
+                            return;
+                        }
+                    })
+
+                    if(data.Message === 'Separação Concluída.') {
+                        Alert.alert("Atenção!","Ordem de Separação: "+separacao+" concluída.");
+                        navigation.goBack();
+                        return
+                    } else {
+                        Alert.alert("Atenção",data.Message);
+                        setOpenCameraReader(false);
+                        setLoading(false);
+                        setReloadPosition(true)
+                        return;
+        
+                    }
+                },
+                isPreferred: true
+            },{
+                text: "Não"
+            }
+        ])
+    }
+
+    const Item = ({item,um,segum,qtdemb = 1, index = 1}) => {
         return (
         <View key={index} style={{ flex: 1, opacity: 1, width: '100%', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#ccc", display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View style={{ width: 42, height: 42, borderRadius: 16, backgroundColor: "#C00", flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -162,14 +209,13 @@ export default function SeparacaoItens({ navigation, route }) {
             </View>
             <View style={{ backgroundColor: "#efefef", borderRadius: 8, paddingVertical: 4, paddingHorizontal: 8, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
                 {rotina === 'SeparacaoPV' ?
-                    <Text style={{ color: "#868686" }}>{item.QUANTIDADE / qtdemb} {segum}</Text>
+                    <Text style={{ color: "#868686" }}>{(item.QUANTIDADE / qtdemb).toFixed(1)} {segum}</Text>
                 :
-                    <Text style={{ color: "#868686" }}>{item.QUANTIDADE} {um}</Text>
+                    <Text style={{ color: "#868686" }}>{item.QUANTIDADE.toFixed(1)} {um}</Text>
                 }
             </View>
         </View>
       )};
-
     return(
         <SafeAreaView style={{ flex:1,borderWidth: 1 }}>
             <HeaderLogin full={false} />
@@ -197,7 +243,7 @@ export default function SeparacaoItens({ navigation, route }) {
                                     itemVisiblePercentThreshold: 100,
                                   }}
                                 renderItem={({item, index, separators}) => (
-                                    <View style={{width: 339.5, height: RFPercentage(80), padding: 18, backgroundColor: "#FFF", borderRadius: 8, marginHorizontal: 2, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center'}}>
+                                    <View style={{width: 339.5, padding: 18, backgroundColor: "#FFF", borderRadius: 8, marginHorizontal: 2, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'center'}}>
                                         <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <View style={{ backgroundColor: "#efefef", borderRadius: 16, width: 120,height: 120, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
                                                 <Text style={{ fontSize: 32, textAlign: 'center', color: "#aaa", fontWeight: 'bold' }}>{item.ENDERECO.trim() !== '' ? item.ENDERECO.trim() : item.ARMAZEM.trim()}</Text>
@@ -223,19 +269,36 @@ export default function SeparacaoItens({ navigation, route }) {
                                             <Text style={{ fontSize: 12, color: "#868686" }}>{item.DESCRICAO.trim()}</Text>
                                         </View>
                                         <View style={{ width: '100%', borderTopWidth: 1, borderColor: "#ccc", paddingVertical: 16, borderRightWidth: 0, borderLeftWidth: 0 }}>
-                                        <View style={{ paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            { ((item.QUANTIDADE - item.SALDOSEPARADO) / item.QUANTIDADE * 100) === 100 ?
-                                                <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', paddingVertical: 0 }}>
-                                                    <Button simple leftIcon="check" title="Totalmente Separado" />
-                                                </View>
-                                            : 
-                                                <TouchableOpacity disabled={loading} onPress={() => handleOpenCamera(item)} style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', paddingVertical: 0 }}>
-                                                    { loading ? <Loading /> : <Button simple leftIcon="camera" title="Abrir Câmera" /> }
-                                                </TouchableOpacity>
+                                            <Text style={{ textAlign: 'center', marginBottom: 4, fontSize: 14, fontWeight: 'bold', color: "#868686" }}>Sugestões de Endereços:</Text>
+                                            {item.SUGESTENDERECOS.map((sugest,index) => {
+                                            if(index > 4) {
+                                                return null
                                             }
-                                        </View>
+                                            return <View key={index} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 2, backgroundColor: index % 2 === 0 ? 'rgba(0,0,0,.03)' : 'transparent', justifyContent: 'space-between', paddingHorizontal: 8, width: '100%'}}>
+                                                <Text style={{ fontSize: 14, fontWeight: 'bold', color: "#868686" }}>{index+1} - {sugest.ENDERECO.trim()}</Text>
+                                                <Text style={{ fontSize: 14, color: "#868686" }}>{sugest.QTD2UM} Cx.</Text>
+                                            </View>
+                                            })}
                                         </View>
                                         <View style={{ width: '100%', borderTopWidth: 1, borderColor: "#ccc", paddingVertical: 16, borderRightWidth: 0, borderLeftWidth: 0 }}>
+                                            <View style={{ paddingHorizontal: 12, paddingVertical: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                { ((item.QUANTIDADE - item.SALDOSEPARADO) / item.QUANTIDADE * 100) === 100 ?
+                                                    <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', paddingVertical: 0 }}>
+                                                        <Button simple leftIcon="check" title="Totalmente Separado" />
+                                                    </View>
+                                                : 
+                                                    <TouchableOpacity disabled={loading} onPress={() => handleOpenCamera(item)} style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', paddingVertical: 0 }}>
+                                                        { loading ? <Loading /> : <Button simple leftIcon="camera" title="Abrir Câmera" /> }
+                                                    </TouchableOpacity>
+                                                }
+                                            </View>
+                                            {item.SALDOSEPARADO > 0 &&
+                                            <TouchableOpacity disabled={loading} onPress={() => handleOcorrencia(item)} style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', paddingVertical: 0 }}>
+                                                <Button simple alert leftIcon="alert-decagram-outline" title={`Informar Ocorrência`} />
+                                            </TouchableOpacity>}
+                                        </View>
+                                        {/* {console.log('aqui',item)} */}
+                                        {item.SEPARADOS.length > 0 && <View style={{ width: '100%', borderTopWidth: 1, borderColor: "#ccc", paddingVertical: 16, borderRightWidth: 0, borderLeftWidth: 0 }}>
                                             <Text style={{ fontSize: 18, fontWeight: 'bold', color: "#868686" }}>Etiquetas Separadas:</Text>
                                             { loading ?
                                             <Loading />
@@ -247,7 +310,7 @@ export default function SeparacaoItens({ navigation, route }) {
                                                 keyExtractor={item => item.codigo}
                                                 />
                                                 : null }
-                                        </View>
+                                        </View>}
                                     </View>
                                 )}
                                 />
@@ -269,8 +332,22 @@ export default function SeparacaoItens({ navigation, route }) {
                             </TouchableOpacity>
                             <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={100}>
                                 <ScrollView>
-                                    <View style={{ width: '100%', paddingVertical: 12 }}>
+                                    <View style={{ width: '100%',paddingVertical: 12, flexDirection: 'column', justifyContent: 'flex-start', alignItems: 'flex-start' }}>
+                                        <View style={{ borderWidth: 1, height: 50, borderRadius: 16, borderColor: '#ccc', marginHorizontal: 32, padding: 8, paddingHorizontal: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <MyInput editable={loading ? false : true}
+                                                onEndEditing={e => handleBarCodeScanned({type: 'text', data: e.nativeEvent.text })}
+                                                placeholder="Digitar etiqueta manualmente"
+                                                value={inputRef?.current || null}
+                                                {...register('etiqueta')}
+                                                ref={inputRef}
+                                                placeholderTextColor={theme.colors.secondary}
+                                                returnKeyType="search"
+                                                keyboardType={'default'}
+                                                style={{ width: 200 }} />
+                                            <MaterialCommunityIcons style={{ color: theme.colors.secondary}} name="barcode-scan" size={24} />
+                                        </View>
                                         <View style={{ width: '100%', height: RFPercentage(78), overflow: 'hidden', zIndex: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}>
+                                            
                                             <BarCodeScanner
                                             onBarCodeScanned={e => handleBarCodeScanned(e)}
                                             style={{ width: RFPercentage(45), height: RFPercentage(100) }}
