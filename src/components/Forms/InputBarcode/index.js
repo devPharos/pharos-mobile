@@ -114,6 +114,18 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
         }
         setFormOutData({...formOutData, QTDJE: apiRet.QTDJE, QTDE: apiRet.QTDE })
       }
+      if(rotina === 'Apontar' && name === 'produtos') {
+        let newItems = [];
+        apiRet.PRODUTOS.map((produto) => {
+          return newItems.push({produto: produto.CODIGO, descricao: produto.DESCRICAO, codigo: produto.ETIQUETA});
+        })
+        setItems(newItems)
+        const produtos = newItems.map((el) => {
+          return el.codigo;
+        })
+        setValue(name, produtos.toString())
+        return;
+      }
       if(apiRet && rotina === 'ManPallet' && name === 'pallet'){
         let newItems = [];
         let newItemsString = [];
@@ -662,7 +674,7 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
           handleBarCodeReader(value, value ? true : false, response.data, name);
           setScanned(true);
         }
-      } 
+      }
     }
 
     const Item = ({item,index}) => {

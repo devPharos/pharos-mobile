@@ -83,6 +83,8 @@ export default function Rotina({ navigation, route }) {
             return
         }
         try {
+            // setLoading(false)
+            console.log(form)
             const { data } = await api.post(`${empresa.apiUrl}/${route.params.ROTINA}?Usuario=${usuario.usuario}`, form);
             if(!data || !data.Status) {
                 setLoading(false);

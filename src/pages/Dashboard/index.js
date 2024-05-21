@@ -22,10 +22,9 @@ export default function Dashboard({ navigation }) {
             setMenus(data.MENUS);
         } catch(err) {
             Alert.alert(`Atenção!`,`${err} - User: ${usuario.usuario} - Url: ${empresa.apiUrl}`);
-            if(!err.includes('status')) {
+            if(err && err.message.includes('Network Error')) {
                 Linking.openURL(empresa.apiUrl)
             }
-            console.log('err', err) 
         }
     }
 
