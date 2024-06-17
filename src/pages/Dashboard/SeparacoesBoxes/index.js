@@ -35,19 +35,30 @@ export default function SeparacaoBoxes({ navigation, route }) {
                 {
                     text: 'Sim', onPress: async () => {
                         try {
-                            await api.put(`${empresa.apiUrl}/${rotina}/inicio`, {
+                            const { data } = await api.put(`${empresa.apiUrl}/${rotina}/inicio`, {
                                 Usuario: usuario.usuario,
                                 OrdemSeparacao: separacao.ORDEMSEPARACAO
                             })
-                            // console.log( data )
-                            separacoes.map((sep) => {
-                                if(sep.ORDEMSEPARACAO == separacao.ORDEMSEPARACAO) {
-                                    sep.STATUS = 1;
-                                    sep.OPERADOR = usuario.usuario
-                                }
-                                return sep;
-                            })
-                            navigation.push("SeparacaoItens", { separacao: separacao.ORDEMSEPARACAO, titulo: `O.S.: ${separacao.ORDEMSEPARACAO}`, itens: separacao.ITENS, rotina })
+                            if(data.Status === 400) {
+
+                                Alert.alert("Atenção!",data.Message,[
+                                    {
+                                    text: 'Ok', onPress: () => { 
+                                        getPageData(rotina, setLoading, null,null, empresa, usuario, setSeparacoes)
+                                        return
+                                    },
+                                    }]
+                                );
+                            } else {
+                                separacoes.map((sep) => {
+                                    if(sep.ORDEMSEPARACAO == separacao.ORDEMSEPARACAO) {
+                                        sep.STATUS = 1;
+                                        sep.OPERADOR = usuario.usuario
+                                    }
+                                    return sep;
+                                })
+                                navigation.push("SeparacaoItens", { separacao: separacao.ORDEMSEPARACAO, titulo: `O.S.: ${separacao.ORDEMSEPARACAO}`, itens: separacao.ITENS, rotina })
+                            }
                         } catch(err) {
                             console.log(err)
                         }

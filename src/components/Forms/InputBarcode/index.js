@@ -29,7 +29,7 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
     const inputRef = useRef();
     const { empresa, usuario } = useRegister();
     let popUpAnim = useRef(new Animated.Value(110)).current;
-
+    console.log(rotina)
     useEffect(() => {
       setBarCodeValue(null)
     },[pagina])
@@ -97,7 +97,9 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
     },[visible])
 
     async function handleBarCodeReader(valor = null, finaliza = false, apiRet = null, name = '') {
+      // console.log(rotina, apiRet)
       if(apiRet && rotina === 'Apontar' && name === 'ordemdeproducao'){
+        console.log(apiRet)
         if(apiRet.QTDJE - apiRet.QTDE == 0 || apiRet.DATAFIM != '  /  /  ') {
           Alert.alert("Atenção!","Esta Ordem de Produção já foi encerrada.",[
             {
@@ -111,14 +113,24 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
               },
             }]
           );
+        } else {
+          setTimeout(() => {
+            if(pagina < paginas) {
+              setPagina(pagina+1);
+            }
+          }, 200)
         }
-        setFormOutData({...formOutData, QTDJE: apiRet.QTDJE, QTDE: apiRet.QTDE })
+        setFormOutData({...formOutData, QTDJE: apiRet.QTDJE, QTDE: apiRet.QTDE, PRODUTO: apiRet.PRODUTO[0].CODIGO })
+        // console.log({...formOutData, QTDJE: apiRet.QTDJE, QTDE: apiRet.QTDE, PRODUTO: apiRet.PRODUTO[0].CODIGO })
       }
       if(rotina === 'Apontar' && name === 'produtos') {
         let newItems = [];
+        let QTDEETIQUETAS = 0
         apiRet.PRODUTOS.map((produto) => {
-          return newItems.push({produto: produto.CODIGO, descricao: produto.DESCRICAO, codigo: produto.ETIQUETA});
+          QTDEETIQUETAS += produto.QUANTIDADE;
+          return newItems.push({produto: produto.CODIGO, descricao: produto.DESCRICAO, codigo: produto.ETIQUETA, quantidade: produto.QUANTIDADE});
         })
+        setFormOutData({...formOutData, QTDEETIQUETAS});
         setItems(newItems)
         const produtos = newItems.map((el) => {
           return el.codigo;
@@ -339,6 +351,7 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
     }
 
     async function handleCameraReader(valor = null, finaliza = false, apiRet = null, name = '') {
+      console.log(rotina)
       if(apiRet && rotina === 'ManPallet' && name === 'pallet'){
         let newItems = [];
         apiRet.PRODUTOS.map((produto,index) => {
@@ -463,7 +476,7 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
         return;
       }
       if(apiRet && multiplo && valor) {
-        if(apiRet.PRODUTOS.length === 0) {
+        if(!apiRet.PRODUTOS || apiRet.PRODUTOS.length === 0) {
           setOpenCameraReader(!finaliza);
           Alert.alert("Atenção!","Produto não localizado!", [
             {
@@ -561,6 +574,9 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
               return
             }
           } else {
+            if(formOutData && formOutData.QTDEETIQUETAS && items[position].quantidade) {
+              setFormOutData({...formOutData, QTDEETIQUETAS: formOutData.QTDEETIQUETAS - items[position].quantidade})
+            }
             const newItems = [...items];
             newItems.splice(position, 1);
             setItems(newItems)
@@ -569,6 +585,14 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
               return el.codigo;
             })
             setValue(name, produtos.toString())
+            if(produtos.toString().trim() === '') {
+              setScanned(false); 
+              handleInput('');
+              setTimeout(() => {
+                inputRef.current?.focus();
+                inputRef.current?.focus();
+              }, 200);
+            }
           }
         }
     }
@@ -666,19 +690,47 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
           setScanned(true);
         }
       } else if(name == 'produtos' && value.length === 10) {
-        setLoading(true)
-        const response = await api.get(`${empresa.apiUrl}/Etiqueta?Etiqueta=${value}`)
-        setLoading(false)
-        if(response.data) {
-          Keyboard.dismiss()
-          handleBarCodeReader(value, value ? true : false, response.data, name);
-          setScanned(true);
+        if(name == 'produtos' && rotina === 'Apontar' && !formOutData.PRODUTO) {
+          Alert.alert("Atenção!","Necessário preencher a Ordem de Produção primeiro.",[
+            {
+              text: 'Ok', onPress: () => {
+                setTimeout(() => {
+                  setPagina(pagina-1);
+                  return;
+                }, 200);
+              },
+            }])
+        } else {
+          setLoading(true)
+          const response = await api.get(`${empresa.apiUrl}/Etiqueta?Etiqueta=${value}`)
+          setLoading(false)
+          if(response.data) {
+            if(name == 'produtos' && rotina === 'Apontar' && formOutData.PRODUTO && formOutData.PRODUTO.trim() !== response.data.PRODUTOS[0].CODIGO.trim()) {
+              Alert.alert("Atenção!","Produto da etiqueta não condiz com a ordem de produção para apontamento.",[
+                {
+                  text: 'Ok', onPress: () => {
+                    setScanned(false); 
+                    handleInput('');
+                    setTimeout(() => {
+                      setLoading(false)
+                      inputRef.current?.focus();
+                      inputRef.current?.focus();
+                    }, 200);
+                  },
+                }])
+                return
+            }
+            console.log(response.data)
+            Keyboard.dismiss()
+            handleBarCodeReader(value, value ? true : false, response.data, name);
+            setScanned(true);
+          }
         }
       }
     }
 
     const Item = ({item,index}) => {
-      // console.log(index)
+      console.log(index)
       return (
       <View key={index} style={{ flex: 1, opacity: itemLoading === index ? 0.2 : 1, width: '100%', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#ccc", display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <TouchableOpacity disabled={itemLoading === index} onPress={() => handleRemoveItem(index)} style={{ width: 42, height: 42, borderRadius: 16, backgroundColor: "#C00", flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -687,6 +739,7 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
         <View style={{ paddingHorizontal: 16, flex: 1 }}>
           <Text style={{ fontSize: 14, fontWeight: 'bold' }}>{item.produto}</Text>
           <Text style={{ fontSize: 12 }}>Etiq.: {item.codigo}</Text>
+          <Text style={{ fontSize: 12 }}>Qtd.: {item.quantidade}</Text>
           <Text style={{ fontSize: 12 }}>{item.descricao}</Text>
         </View>
       </View>
@@ -740,10 +793,10 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
           </Modal> : null }
         </Container>
       </KeyboardAvoidingView>
-      { multiplo && visible ? 
+      { multiplo && items.length > 0 && visible ? 
       <View style={{ marginVertical: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: "#222", padding: 8, borderTopLeftRadius: 8, borderTopRightRadius: 8 }}>
-          <Text style={{ color: "#FFF" }}>{rotina === 'Inventario' ? `Etiquetas no Endereço ${formOutData.endereco}:` : 'Produtos no Pallet:'}</Text>
+          <Text style={{ color: "#FFF" }}>{rotina === 'Inventario' ? `Etiquetas no Endereço ${formOutData.endereco}:` : 'Produtos no Pallet:'} {formOutData.QTDEETIQUETAS}</Text>
           <Text style={{ backgroundColor: "#FFF", padding: 4, paddingHorizontal: 8, borderRadius: 8, fontWeight: 'bold', fontSize: 18, textAlign: 'right', alignSelf: 'flex-end' }}>{items.length}</Text>
         </View>
         {loading ? <View style={{ width: '100%',height: '100%',flex: 1, flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 48, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,.9)', position: 'absolute', zIndex: 10 }}><Loading title="Atualizando..." /></View> : null }

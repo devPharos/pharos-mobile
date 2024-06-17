@@ -66,6 +66,7 @@ export default function SeparacaoItens({ navigation, route }) {
 
 
     async function handleBarCodeScanned({ type, data }) {
+        // console.log({type, data})
         const qtdItens = find.QUANTIDADE / find.QTDEMB;
 
         if(loading) {
@@ -75,9 +76,23 @@ export default function SeparacaoItens({ navigation, route }) {
         try {
             const { data: etiqueta } = await api.get(`${empresa.apiUrl}/Etiqueta?Etiqueta=${data}&Usuario=${usuario.usuario}`);
 
+            if(!etiqueta.PRODUTOS || etiqueta.PRODUTOS.length === 0) {
+                setOpenCameraReader(false);
+                Alert.alert("Atenção!","Etiqueta não localizada. Certifique-se de que ela existe no sistema.")
+                setLoading(false);
+                return;
+            }
+
             if(etiqueta.PRODUTOS[0].CODIGO.trim() !== find.PRODUTO.trim()) {
                 setOpenCameraReader(false);
                 Alert.alert("Produto incorreto!","A etiqueta deve ser do produto: "+find.PRODUTO.trim())
+                api.post(`${empresa.apiUrl}/Erros`, {
+                    Usuario: usuario.usuario,
+                    Rotina: 'Separação',
+                    Tipo: 'Leitura',
+                    Descricao: 'Produto incorreto! A etiqueta deve ser do produto: '+find.PRODUTO.trim()+' porém foi lido produto: '+etiqueta.PRODUTOS[0].CODIGO.trim()+' da etiqueta: '+data.trim(),
+                    Codigo: separacao
+                })
                 setLoading(false);
                 return;
             }
@@ -104,7 +119,7 @@ export default function SeparacaoItens({ navigation, route }) {
                 Etiqueta: etiqueta.CODIGO.trim() || etiqueta.PALLET.trim()
             });
 
-            if(separado.Message === 'Item separado.' || separado.Message === 'Separação Concluída.') {
+            if(separado && separado.Message && (separado.Message === 'Item separado.' || separado.Message === 'Separação Concluída.')) {
                 
                 itens.map((item) => {
                     if(etiqueta.PRODUTOS[0].ARMAZEM.trim() === find.ARMAZEM.trim() && find.ARMAZEM.trim() === item.ARMAZEM.trim() &&
@@ -128,8 +143,11 @@ export default function SeparacaoItens({ navigation, route }) {
                 })
 
             } else {
-            
-                Alert.alert("Atenção",separado.Message);
+                if(separado && separado.Message) {
+                    Alert.alert("Atenção",separado.Message );
+                } else {
+                    Alert.alert("Atenção","Não foi possível a leitura da etiqueta, tente novamente.");
+                }
                 setOpenCameraReader(false);
                 setLoading(false);
                 return;

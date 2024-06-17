@@ -8,6 +8,7 @@ export async function getPageData(page, setLoading, setPaginas, setInputs, empre
     setLoading(true)
     try {
         const { data } = await api.get(`${empresa.apiUrl}/${page}?Usuario=${usuario.usuario}`)
+        // console.log(data)
         if(['SeparacaoPV','SeparacaoOP','Picking'].includes(page)) {
             setSeparacoes(data)
             wait(100)
