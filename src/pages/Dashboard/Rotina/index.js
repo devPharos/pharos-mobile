@@ -33,6 +33,35 @@ export default function Rotina({ navigation, route }) {
     
     async function handleSend(form) {
         setLoading(true)
+        async function enviar() {
+            try {
+                const { data } = await api.post(`${empresa.apiUrl}/${route.params.ROTINA}?Usuario=${usuario.usuario}`, form);
+                if(!data || !data.Status) {
+                    setLoading(false);
+                    navigation.goBack();
+                    return;
+                }
+                Alert.alert(`Atenção!`,`${data.Status}: ${data.Message}`,[
+                    {
+                      text: 'Ok', onPress: () => {
+                        setLoading(false);
+                        if(data.Status === 200) {
+                            navigation.goBack();
+                            return;
+                        }
+                    },
+                    },
+                ]);
+            } catch(err) {
+                Alert.alert(`Atenção!`,`erro: ${err}`,[
+                    {
+                      text: 'Ok', onPress: () => {
+                        setLoading(false);
+                    },
+                    },
+                ]);
+            }
+        }
         if(picking) {
             if(form.enderecoorigem !== picking.ENDERECO.trim()) {
                 Alert.alert(`Atenção!`,`Endereço de origem não coincide com a solicitação de transferência.`,[
@@ -82,35 +111,23 @@ export default function Rotina({ navigation, route }) {
             setLoading(false);
             return
         }
-        try {
-            // setLoading(false)
-            console.log(form)
-            const { data } = await api.post(`${empresa.apiUrl}/${route.params.ROTINA}?Usuario=${usuario.usuario}`, form);
-            if(!data || !data.Status) {
-                setLoading(false);
-                navigation.goBack();
-                return;
-            }
-            Alert.alert(`Atenção!`,`${data.Status}: ${data.Message}`,[
+        if(rotina === 'Apontar') {
+            Alert.alert(`Atenção!`,`Você confirma que o palete que está sendo apontado possui ${formOutData.QTDEETIQUETAS} unidades, que equivale a ${formOutData.QTDECAIXAS} ${formOutData.SEGUM ? formOutData.SEGUM : 'N/D'}?`,[
                 {
-                  text: 'Ok', onPress: () => {
-                    setLoading(false);
-                    if(data.Status === 200) {
-                        navigation.goBack();
-                        return;
+                    text: 'Sim', onPress: () => {
+                        enviar();
                     }
                 },
-                },
-            ]);
-        } catch(err) {
-            Alert.alert(`Atenção!`,`erro: ${err}`,[
                 {
-                  text: 'Ok', onPress: () => {
-                    setLoading(false);
-                },
-                },
+                    text: 'Cancelar', onPress: () => {
+                        return false;
+                    }
+                }
             ]);
+        } else {
+            enviar();
         }
+        
     }
 
     useEffect(() => {

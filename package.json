@@ -1,6 +1,6 @@
 {
   "name": "bandeirante-2024",
-  "version": "1.0.48",
+  "version": "1.0.49",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
     "start": "npx expo start",
@@ -22,9 +22,9 @@
     "@react-navigation/material-top-tabs": "^6.6.5",
     "@react-navigation/native": "^6.1.9",
     "@react-navigation/native-stack": "^6.9.17",
-    "axios": "^1.6.5",
+    "axios": "^1.7.2",
     "expo": "~49.0.15",
-    "expo-barcode-scanner": "~12.5.3",
+    "expo-barcode-scanner": "12.5.3",
     "expo-splash-screen": "~0.20.5",
     "expo-status-bar": "~1.6.0",
     "hpagent": "^1.2.0",

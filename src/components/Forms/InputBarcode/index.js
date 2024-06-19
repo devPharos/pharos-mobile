@@ -29,7 +29,6 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
     const inputRef = useRef();
     const { empresa, usuario } = useRegister();
     let popUpAnim = useRef(new Animated.Value(110)).current;
-    console.log(rotina)
     useEffect(() => {
       setBarCodeValue(null)
     },[pagina])
@@ -97,9 +96,10 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
     },[visible])
 
     async function handleBarCodeReader(valor = null, finaliza = false, apiRet = null, name = '') {
-      // console.log(rotina, apiRet)
+      if(apiRet && apiRet.PRODUTOS && apiRet.PRODUTOS.length > 0) {
+        setFormOutData({...formOutData, SEGUM: apiRet.PRODUTOS[0].SEGUM});
+      }
       if(apiRet && rotina === 'Apontar' && name === 'ordemdeproducao'){
-        console.log(apiRet)
         if(apiRet.QTDJE - apiRet.QTDE == 0 || apiRet.DATAFIM != '  /  /  ') {
           Alert.alert("Atenção!","Esta Ordem de Produção já foi encerrada.",[
             {
@@ -126,11 +126,30 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
       if(rotina === 'Apontar' && name === 'produtos') {
         let newItems = [];
         let QTDEETIQUETAS = 0
+        let temOP = false;
         apiRet.PRODUTOS.map((produto) => {
-          QTDEETIQUETAS += produto.QUANTIDADE;
-          return newItems.push({produto: produto.CODIGO, descricao: produto.DESCRICAO, codigo: produto.ETIQUETA, quantidade: produto.QUANTIDADE});
+          if(produto.OP.trim() === '') {
+            QTDEETIQUETAS += produto.QUANTIDADE;
+            return newItems.push({produto: produto.CODIGO, descricao: produto.DESCRICAO, codigo: produto.ETIQUETA, quantidade: produto.QUANTIDADE});
+          } else {
+            temOP = true;
+          }
         })
-        setFormOutData({...formOutData, QTDEETIQUETAS});
+        if(temOP) {
+          Alert.alert("Atenção!","Este pallet contém produtos já apontados.",[
+            {
+              text: 'Ok', onPress: () => { 
+                setScanned(false); 
+                handleInput('');
+                setTimeout(() => {
+                  inputRef.current?.focus();
+                  inputRef.current?.focus();
+                }, 200);
+                return },
+            }]
+          );
+        }
+        setFormOutData({...formOutData, QTDEETIQUETAS, QTDECAIXAS: newItems.length});
         setItems(newItems)
         const produtos = newItems.map((el) => {
           return el.codigo;
@@ -250,7 +269,6 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
         return;
       }
       if(rotina === 'TrfEnd' && name === 'produtos') {
-        console.log({ picking })
         let newItems = [];
         if(apiRet.PALLET.trim() !== '' && apiRet.CODIGO.trim() !== '' && apiRet.PALLET.trim() !== apiRet.CODIGO.trim()) {
           Alert.alert("Atenção!","Esta etiqueta pertence ao pallet "+apiRet.PALLET+" e portanto não pode ser transferida individualmente.",[
@@ -351,7 +369,6 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
     }
 
     async function handleCameraReader(valor = null, finaliza = false, apiRet = null, name = '') {
-      console.log(rotina)
       if(apiRet && rotina === 'ManPallet' && name === 'pallet'){
         let newItems = [];
         apiRet.PRODUTOS.map((produto,index) => {
@@ -383,10 +400,8 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
         return;
       }
       if(rotina === 'Inventario' && name === 'endereco') {
-        console.log('Aqui')
         setOpenCameraReader(false);
         let newItems = [];
-        console.log(apiRet.PRODUTOS)
         apiRet.PRODUTOS.map((produto,index) => {
           return newItems.push({produto: produto.PRODUTO, descricao: produto.DESCRICAO, codigo: produto.CODIGO});
         })
@@ -720,7 +735,6 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
                 }])
                 return
             }
-            console.log(response.data)
             Keyboard.dismiss()
             handleBarCodeReader(value, value ? true : false, response.data, name);
             setScanned(true);
@@ -730,7 +744,6 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
     }
 
     const Item = ({item,index}) => {
-      console.log(index)
       return (
       <View key={index} style={{ flex: 1, opacity: itemLoading === index ? 0.2 : 1, width: '100%', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#ccc", display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
         <TouchableOpacity disabled={itemLoading === index} onPress={() => handleRemoveItem(index)} style={{ width: 42, height: 42, borderRadius: 16, backgroundColor: "#C00", flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -796,8 +809,8 @@ export default function InputBarcode({ setLoading, loading, setPagina, pagina, p
       { multiplo && items.length > 0 && visible ? 
       <View style={{ marginVertical: 16, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <View style={{ width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: "#222", padding: 8, borderTopLeftRadius: 8, borderTopRightRadius: 8 }}>
-          <Text style={{ color: "#FFF" }}>{rotina === 'Inventario' ? `Etiquetas no Endereço ${formOutData.endereco}:` : 'Produtos no Pallet:'} {formOutData.QTDEETIQUETAS}</Text>
-          <Text style={{ backgroundColor: "#FFF", padding: 4, paddingHorizontal: 8, borderRadius: 8, fontWeight: 'bold', fontSize: 18, textAlign: 'right', alignSelf: 'flex-end' }}>{items.length}</Text>
+          <Text style={{ color: "#FFF" }}>{rotina === 'Inventario' ? `Etiquetas no Endereço ${formOutData.endereco}:` : 'Unidades no Pallet:'} {formOutData.QTDEETIQUETAS}</Text>
+          <Text style={{ backgroundColor: "#FFF", padding: 4, paddingHorizontal: 8, borderRadius: 8, fontWeight: 'bold', fontSize: 18, textAlign: 'right', alignSelf: 'flex-end' }}>{items.length} <Text style={{ fontSize: 12 }}>{formOutData.SEGUM ? formOutData.SEGUM : 'N/D'}</Text></Text>
         </View>
         {loading ? <View style={{ width: '100%',height: '100%',flex: 1, flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 48, justifyContent: 'center', backgroundColor: 'rgba(255,255,255,.9)', position: 'absolute', zIndex: 10 }}><Loading title="Atualizando..." /></View> : null }
         <FlatList
