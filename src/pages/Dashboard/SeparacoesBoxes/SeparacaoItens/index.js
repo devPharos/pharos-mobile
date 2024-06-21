@@ -14,7 +14,6 @@ import { CircularProgressBase } from 'react-native-circular-progress-indicator';
 import api from '../../../../services/api';
 import { MyInput } from '../../../../components/Forms/InputBarcode/styles';
 import { useForm } from 'react-hook-form';
-import axios from 'axios';
 
 export default function SeparacaoItens({ navigation, route }) {
     const { empresa, usuario } = useRegister();
@@ -25,6 +24,7 @@ export default function SeparacaoItens({ navigation, route }) {
     const [find, setFind] = useState(null);
     const [loading, setLoading] = useState(false)
     const [reloadPosition, setReloadPosition] = useState(true);
+    const [lastPosition, setLastPosition] = useState(0)
     const { rotina } = route.params;
     const itemsFlatListRef = useRef();
 
@@ -49,9 +49,7 @@ export default function SeparacaoItens({ navigation, route }) {
         if(reloadPosition && itens && itens.length > 0) {
             let found = false;
             for(let i = 0; i < itens.length; i++) {
-                // console.log(i,itens[i].ocorrencia)
-                // itens[i].ocorrencia = null
-                if(itens[i].SALDOSEPARADO > 0 && !found && !itens[i].ocorrencia) {
+                if(itens[i].SALDOSEPARADO > 0 && !found && !itens[i].ocorrencia && lastPosition === 0) {
                     found = true;
                     setTimeout(() => {
                         itemsFlatListRef.current.scrollToOffset({
@@ -59,6 +57,8 @@ export default function SeparacaoItens({ navigation, route }) {
                         })
                     },2000)
                     setReloadPosition(false)
+                    setLastPosition(i)
+                    break;
                 }
             }
         }
@@ -75,7 +75,7 @@ export default function SeparacaoItens({ navigation, route }) {
         setLoading(true);
         try {
             const { data: etiqueta } = await api.get(`${empresa.apiUrl}/Etiqueta?Etiqueta=${data}&Usuario=${usuario.usuario}`);
-
+            console.log(etiqueta)
             if(!etiqueta.PRODUTOS || etiqueta.PRODUTOS.length === 0) {
                 setOpenCameraReader(false);
                 Alert.alert("Atenção!","Etiqueta não localizada. Certifique-se de que ela existe no sistema.")

@@ -85,9 +85,6 @@ export default function Dashboard({ navigation }) {
                         <Button title="Atualizar Menus" />
                     </TouchableOpacity>
                 </View>
-                <View>
-                    <Text style={{ color:"#ddd", flex:1, textAlign: 'center' }}>Usuário: {usuario.usuario}</Text>
-                </View>
             </ScrollView>
         </Page>
     </>
